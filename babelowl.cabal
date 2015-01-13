@@ -1,0 +1,41 @@
+name:                babelowl
+version:             0.0.1
+synopsis:            Translate your texts
+homepage:            https://github.com/yourName/repoName
+license:             MIT
+author:              Scott Maher
+maintainer:          you@email.com
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.8
+
+executable babelowl
+  main-is:             Main.hs
+  -- other-modules:       
+  build-depends:       base ==4.7.*
+                     , wai
+                     , warp
+                     , http-types
+                     , resourcet
+                     , scotty
+                     , text
+                     , bytestring
+                     , blaze-html
+                     -- , persistent ==1.3.*
+                     --, persistent-template ==1.3.*
+                     --, persistent-sqlite ==1.3.*
+                     --, persistent-postgresql ==1.3.*
+                     , monad-logger 
+                     --, heroku
+                     , transformers
+                     , wai-middleware-static
+                     , wai-extra
+                     , time
+                     , aeson    >= 0.6   
+                     , parsec   >= 3.1   && < 4.0
+                     , conduit  >= 1.0
+                     , http-conduit >= 1.9
+                     , http-client
+                     , exceptions
+                     , containers
+                     , http-client-tls
