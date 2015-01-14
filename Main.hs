@@ -9,6 +9,7 @@ import Network.HTTP.Types.Header (ResponseHeaders)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 import Data.Functor
+import Data.Maybe (fromJust)
 import Data.Conduit 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -45,7 +46,7 @@ data GoogleTranslation = GoogleTranslation {
   , gtr_Translation :: T.Text
 } deriving Show
 
-newtype GoogleTranslateResult = GoogleTranslateResult { getGoogleTranslations :: [GoogleTranslation] }
+newtype GoogleTranslateResult = GoogleTranslateResult { getGoogleTranslations :: [GoogleTranslation] } deriving Show
 
 instance FromJSON GoogleTranslation where
   parseJSON (Object v) =
@@ -75,7 +76,7 @@ getLangByName inName = Map.lookup (T.toLower inName) langNameMap
 googleTranslateQuery :: GoogleKey -> Lang -> T.Text -> T.Text
 googleTranslateQuery key lang body =
   T.concat [
-    "https://www.google.com/language/translate/v2?key=" , getGoogleKey key
+    "https://www.googleapis.com/language/translate/v2?key=" , getGoogleKey key
     , "&target=", lang_Code lang
     , "&q=", body
   ]
@@ -110,7 +111,6 @@ parseConfig confBuf =
 main :: IO ()
 main = do
   configBuf <- fmap TE.decodeUtf8 $ B.readFile "babelOwlConfig"
-  putStrLn $ show $ parseConfig configBuf
-  case parseConfig configBuf of 
-    Nothing -> error "Bad config."
-    Just (googleKey, twiCred) -> putStrLn $ show twiCred
+  let (googleKey,twilioCredentials) = fromJust $ parseConfig configBuf
+  trans <- getTranslation googleKey (Lang "french" "fr") "i love the french"
+  putStrLn $ show trans
