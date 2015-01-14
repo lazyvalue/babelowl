@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 import Web.Scotty
-import qualified Data.Text as T
 
 import Network.HTTP.Conduit (parseUrl, newManager, httpLbs, RequestBody(..), Response(..), HttpException(..), Request(..), Manager, simpleHttp, withManager)
 import Network.HTTP.Client (defaultManagerSettings)
@@ -11,6 +10,9 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 import Data.Functor
 import Data.Conduit 
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
+
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Catch
@@ -36,7 +38,7 @@ data TwilioCredentials = TwilioCredentials {
   , twilio_authToken :: T.Text
 } deriving Show
 
-newtype GoogleKey = GoogleKey { getGoogleKey :: T.Text }
+newtype GoogleKey = GoogleKey { getGoogleKey :: T.Text } deriving Show
 
 data GoogleTranslation = GoogleTranslation {
   gtr_DetectedSourceLanguage :: T.Text
@@ -69,8 +71,6 @@ langNameMap = Map.fromList $ map (\l -> (lang_Name l, l)) langList
 getLangByName :: T.Text -> Maybe Lang
 getLangByName inName = Map.lookup (T.toLower inName) langNameMap
 
--- https://www.google.com/language/translate/v2?q=i+love+the+french&target=fr&key=AIzaSyBjzHewaAbupYYNJJLlNlAplSPsoyuibxw
-
 -- [ Request building
 googleTranslateQuery :: GoogleKey -> Lang -> T.Text -> T.Text
 googleTranslateQuery key lang body =
@@ -92,22 +92,25 @@ getTranslation gKey lang body = runResourceT $ do
       let x = putStrLn "Fucked" -- TBD better error handling
       in liftIO mzero
 
-
-doRequest urlStr = do
-  theBody <- runResourceT $ do
-    manager <- liftIO $ newManager tlsManagerSettings
-    req <- liftIO $ parseUrl urlStr
-    httpLbs req manager
-  LB.putStrLn $ responseBody theBody
-
-doRequest2 urlStr = do
-  someBody <- simpleHttp urlStr
-  LB.putStrLn $ someBody
-
 -- [ Main function entry point
 --main = scotty 3000 $ do
 --  get "/" $ do
 --    html "Hello World!"
+
+parseConfig :: T.Text -> Maybe (GoogleKey, TwilioCredentials)
+parseConfig confBuf =
+  let tuplify [x,y] = (x,y)
+      configMap = Map.fromList $ map (tuplify . (T.split (== '='))) $ T.lines confBuf
+      lookup = (flip Map.lookup) configMap
+      googleKey = GoogleKey <$> lookup "googleApiKey"
+      twiKey = TwilioCredentials <$> lookup "twilioAccountSid" <*> lookup "twilioAuthToken"
+	in (\x y -> (x,y)) <$> googleKey <*> twiKey
+
+
 main :: IO ()
 main = do
-  doRequest2 "https://google.com"
+  configBuf <- fmap TE.decodeUtf8 $ B.readFile "babelOwlConfig"
+  putStrLn $ show $ parseConfig configBuf
+  case parseConfig configBuf of 
+    Nothing -> error "Bad config."
+    Just (googleKey, twiCred) -> putStrLn $ show twiCred
