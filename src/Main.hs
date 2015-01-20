@@ -2,18 +2,27 @@
 module Main where
 
 import Web.Scotty
-import Translate
+
+-- Local imports
+import Twiml
+import BabelTypes
 
 import Network.HTTP.Conduit (parseUrl, newManager, httpLbs, RequestBody(..), Response(..), HttpException(..), Request(..), Manager, simpleHttp, withManager)
 
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 
+import Data.Aeson
+import Data.Conduit 
+import Data.Either
 import Data.Functor
 import Data.Maybe (fromJust)
-import Data.Conduit 
+
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as TE
+import qualified Data.Map.Strict as Map
+import qualified Data.ByteString.Lazy as LB
+import qualified Data.ByteString as B
 
 import Control.Applicative
 import Control.Monad
@@ -21,49 +30,6 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Exception.Base
 import Control.Monad.Trans.Resource (runResourceT)
-
-import qualified Data.Map.Strict as Map
-
-import Data.Aeson
-import Data.Either
-
-import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString as B
-
--- [ Type definitions 
-data Lang = Lang {
-  lang_Name :: T.Text
-  , lang_Code :: T.Text
-} deriving Show
-
-data ParseException = BadFormat | UnknownLanguage deriving Show
-
-data TwilioCredentials = TwilioCredentials {
-  twilio_accountSid :: T.Text
-  , twilio_authToken :: T.Text
-} deriving Show
-
-newtype GoogleKey = GoogleKey { getGoogleKey :: T.Text } deriving Show
-
-data GoogleTranslation = GoogleTranslation {
-  gtr_DetectedSourceLanguage :: T.Text
-  , gtr_Translation :: T.Text
-} deriving Show
-
-newtype GoogleTranslateResult = GoogleTranslateResult { getGoogleTranslations :: [GoogleTranslation] } deriving Show
-
-instance FromJSON GoogleTranslation where
-  parseJSON (Object v) =
-    GoogleTranslation <$>
-      v .: "detectedSourceLanguage" <*>
-      v .: "translatedText"
-  parseJSON _ = mzero
-
-instance FromJSON GoogleTranslateResult where
-  parseJSON (Object v) = do
-    dataNode <- v .: "data"
-    GoogleTranslateResult <$> dataNode .: "translations"
-  parseJSON _ = mzero
 
 -- [ Language maps and tools
 
@@ -87,10 +53,9 @@ googleTranslateQuery key lang body =
     , "&q=", body
   ]
 
-getGoogleTranslation :: GoogleKey -> Lang -> T.Text -> IO GoogleTranslateResult
-getGoogleTranslation gKey lang body = runResourceT $ do
+getGoogleTranslation :: Manager -> GoogleKey -> Lang -> T.Text -> IO GoogleTranslateResult
+getGoogleTranslation man gKey lang body = runResourceT $ do
   req <- parseUrl $ T.unpack $ googleTranslateQuery gKey lang body
-  man <- liftIO $ newManager tlsManagerSettings
   response <- (httpLbs req man)
   let mResult = decode $ responseBody response
   case mResult of
@@ -98,9 +63,6 @@ getGoogleTranslation gKey lang body = runResourceT $ do
     Nothing -> 
       let x = putStrLn "Fucked" -- TBD better error handling
       in liftIO mzero
-
-tryMe :: T.Text -> T.Text
-tryMe v = T.concat ["this is silly ", v]
 
 parseTextRequest :: T.Text -> Either ParseException (Lang, T.Text)
 parseTextRequest input = do
@@ -113,11 +75,6 @@ parseTextRequest input = do
     Just lang -> return (lang, toTranslate)
     Nothing -> Left UnknownLanguage
 
--- [ Main function entry point
--- main2 = scotty 3000 $ do
---   get "/" $ do
---     x <- param "lar"
---     html $ TL.pack $ show (tryMe x)
 
 webTranslateAction :: GetTranslation -> ActionM ()
 webTranslateAction getTransF = do
@@ -145,8 +102,9 @@ main :: IO ()
 main = do
   configBuf <- fmap TE.decodeUtf8 $ B.readFile "babelOwlConfig"
   let (googleKey,twilioCredentials) = fromJust $ parseConfig configBuf
-  let translateF = getGoogleTranslation googleKey 
-  --scotty 3000 $ do
-  --  post "/translate" $ webTranslateAction translateF
-  trans <- getGoogleTranslation googleKey (Lang "french" "fr") "i love the french"
-  putStrLn $ show trans
+  httpManager <- newManager tlsManagerSettings
+  let translateF = getGoogleTranslation httpManager googleKey 
+  scotty 3000 $ do
+    post "/translate" $ webTranslateAction translateF
+  --trans <- getGoogleTranslation googleKey (Lang "french" "fr") "i love the french"
+  --putStrLn $ show trans

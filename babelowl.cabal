@@ -34,3 +34,4 @@ executable babelowl
                      , exceptions
                      , containers
                      , http-client-tls
+                     , xml-conduit
