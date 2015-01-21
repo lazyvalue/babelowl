@@ -8,16 +8,37 @@ import Control.Monad
 import qualified Data.Map as M
 
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import Text.XML 
 
-mkElem :: T.Text -> [(T.Text,T.Text)] -> [Element] -> Element
-mkElem name attrs subElems =
-  Element (Name name Nothing Nothing) M.empty (map NodeElement subElems)
+mkAttrElem :: T.Text -> [(T.Text,T.Text)] -> [Element] -> Element
+mkAttrElem name attrLst subElems =
+  Element (Name name Nothing Nothing) attrM (map NodeElement subElems)
+  where tpler (attrN, attrV) = ((Name attrN Nothing Nothing), attrV)
+        attrM = M.fromList (map tpler attrLst)
 
-mkElemS :: T.Text -> [Element] -> Element
-mkElemS name subElems = mkElem name [] subElems
+mkElem :: T.Text -> [Element] -> Element
+mkElem name subElems = mkAttrElem name [] subElems
 
---mkSuccessTwiml :: Lang -> T.Text -> T.Text
-mkSuccessTwiml lang body =
-  --documentRoot $ elementName (nameLocalName "twiml")
-  Element (Name "twiml" Nothing Nothing) M.empty []
+mkTextElem :: T.Text -> T.Text -> Element
+mkTextElem name body =
+  Element (Name name Nothing Nothing) M.empty [(NodeContent body)]
+
+mkDumbDocText :: Element -> T.Text
+mkDumbDocText docRoot =
+  TL.toStrict $ renderText def $ Document pro docRoot []
+  where pro = Prologue [] Nothing []
+
+mkSuccessTwimlElem :: Lang -> T.Text -> Element
+mkSuccessTwimlElem lang body =
+  mkElem "Response" [
+    mkTextElem "Message" body
+  ]
+
+mkFailureTwiml :: T.Text
+mkFailureTwiml = 
+  mkDumbDocText (mkElem "Response" [mkTextElem "Message" "I have no idea"])
+
+mkSuccessTwiml :: Lang -> T.Text -> T.Text
+mkSuccessTwiml lang body = 
+  mkDumbDocText (mkSuccessTwimlElem lang body)
