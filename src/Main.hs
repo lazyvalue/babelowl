@@ -82,11 +82,11 @@ webTranslateAction getTransF = do
   let parseResult = parseTextRequest $ TL.toStrict msgBody
   sometext <- case parseResult of
     Left problem -> 
-      return $ TL.pack $ show problem
+      return $ mkFailureTwiml
     Right (lang, text) -> liftIO (do 
         translationResult <- getTransF lang text
         let transText = gtr_Translation $ head (getGoogleTranslations translationResult)
-        return $ TL.fromStrict transText)
+        return $ mkSuccessTwiml lang transText)
   html sometext
 
 parseConfig :: T.Text -> Maybe (GoogleKey, TwilioCredentials)
@@ -106,5 +106,3 @@ main = do
   let translateF = getGoogleTranslation httpManager googleKey 
   scotty 3000 $ do
     post "/translate" $ webTranslateAction translateF
-  --trans <- getGoogleTranslation googleKey (Lang "french" "fr") "i love the french"
-  --putStrLn $ show trans

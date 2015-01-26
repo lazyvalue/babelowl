@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Twiml where
+module Twiml (
+  mkSuccessTwiml
+  , mkFailureTwiml
+) where
 
 import BabelTypes
-
 import Control.Monad
-
 import qualified Data.Map as M
-
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Text.XML 
@@ -24,10 +24,10 @@ mkTextElem :: T.Text -> T.Text -> Element
 mkTextElem name body =
   Element (Name name Nothing Nothing) M.empty [(NodeContent body)]
 
-mkDumbDocText :: Element -> T.Text
+mkDumbDocText :: Element -> TL.Text
 mkDumbDocText docRoot =
-  TL.toStrict $ renderText def $ Document pro docRoot []
-  where pro = Prologue [] Nothing []
+  renderText def $ Document pro docRoot []
+    where pro = Prologue [] Nothing []
 
 mkSuccessTwimlElem :: Lang -> T.Text -> Element
 mkSuccessTwimlElem lang body =
@@ -35,10 +35,10 @@ mkSuccessTwimlElem lang body =
     mkTextElem "Message" body
   ]
 
-mkFailureTwiml :: T.Text
+mkFailureTwiml :: TL.Text
 mkFailureTwiml = 
   mkDumbDocText (mkElem "Response" [mkTextElem "Message" "I have no idea"])
 
-mkSuccessTwiml :: Lang -> T.Text -> T.Text
+mkSuccessTwiml :: Lang -> T.Text -> TL.Text
 mkSuccessTwiml lang body = 
   mkDumbDocText (mkSuccessTwimlElem lang body)
