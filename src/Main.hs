@@ -6,6 +6,7 @@ import Web.Scotty
 -- Local imports
 import Twiml
 import BabelTypes
+import TwilioApi
 
 import Network.HTTP.Conduit (parseUrl, newManager, httpLbs, RequestBody(..), Response(..), HttpException(..), Request(..), Manager, simpleHttp, withManager)
 
@@ -74,7 +75,6 @@ parseTextRequest input = do
   case (getLangByName langText) of
     Just lang -> return (lang, toTranslate)
     Nothing -> Left UnknownLanguage
-
 
 webTranslateAction :: GetTranslation -> ActionM ()
 webTranslateAction getTransF = do
