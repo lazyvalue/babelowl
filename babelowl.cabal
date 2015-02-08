@@ -35,3 +35,4 @@ executable babelowl
                      , containers
                      , http-client-tls
                      , xml-conduit
+                     , hedis >= 0.6.5

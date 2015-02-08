@@ -6,6 +6,7 @@ module BabelTypes (
   , GoogleKey (..)
   , GoogleTranslation (..)
   , GoogleTranslateResult (..)
+  , RedisConfig (..)
 ) where
 
 import Control.Applicative
@@ -29,6 +30,11 @@ data TwilioCredentials = TwilioCredentials {
 } deriving Show
 
 newtype GoogleKey = GoogleKey { getGoogleKey :: T.Text } deriving Show
+
+data RedisConfig = RedisConfig {
+  redisHost :: T.Text
+  , redisPort :: Int
+}
 
 data GoogleTranslation = GoogleTranslation {
   gtr_DetectedSourceLanguage :: T.Text

@@ -32,6 +32,8 @@ import Control.Monad.IO.Class
 import Control.Exception.Base
 import Control.Monad.Trans.Resource (runResourceT)
 
+import qualified Database.Redis as R
+
 -- [ Language maps and tools
 
 langList = [ Lang "french" "fr", Lang "german" "de" ]
@@ -43,7 +45,9 @@ langNameMap = Map.fromList $ map (\l -> (lang_Name l, l)) langList
 getLangByName :: T.Text -> Maybe Lang
 getLangByName inName = Map.lookup (T.toLower inName) langNameMap
 
+-- handy function declarations
 type GetTranslation = Lang -> T.Text -> IO GoogleTranslateResult
+type Storer = T.Text -> T.Text -> IO ()
 
 -- [ Request building
 googleTranslateQuery :: GoogleKey -> Lang -> T.Text -> T.Text
@@ -76,9 +80,10 @@ parseTextRequest input = do
     Just lang -> return (lang, toTranslate)
     Nothing -> Left UnknownLanguage
 
-webTranslateAction :: GetTranslation -> ActionM ()
-webTranslateAction getTransF = do
+webTranslateAction :: GetTranslation -> Storer -> ActionM ()
+webTranslateAction getTransF storer = do
   msgBody <- param "Body"
+  --msgSid <- param "MessageSid"
   let parseResult = parseTextRequest $ TL.toStrict msgBody
   sometext <- case parseResult of
     Left problem -> 
@@ -89,20 +94,38 @@ webTranslateAction getTransF = do
         return $ mkSuccessTwiml lang transText)
   html sometext
 
-parseConfig :: T.Text -> Maybe (GoogleKey, TwilioCredentials)
+parseConfig :: T.Text -> Maybe (GoogleKey, TwilioCredentials, RedisConfig)
 parseConfig confBuf =
   let tuplify [x,y] = (x,y)
       configMap = Map.fromList $ map (tuplify . (T.split (== '='))) $ T.lines confBuf
       lookup = (flip Map.lookup) configMap
       googleKey = GoogleKey <$> lookup "googleApiKey"
       twiKey = TwilioCredentials <$> lookup "twilioAccountSid" <*> lookup "twilioAuthToken"
-	in (\x y -> (x,y)) <$> googleKey <*> twiKey
+      redisConfig = RedisConfig <$> lookup "redisHost" <*> Just 6379
+  in (,,) <$> googleKey <*> twiKey <*> redisConfig
+
+
+putDb :: R.Connection -> T.Text -> T.Text -> IO ()
+putDb conn key val = undefined
 
 main :: IO ()
 main = do
+  -- parse config
   configBuf <- fmap TE.decodeUtf8 $ B.readFile "babelOwlConfig"
-  let (googleKey,twilioCredentials) = fromJust $ parseConfig configBuf
+  let (googleKey,twilioCredentials, redisConfig) = fromJust $ parseConfig configBuf
+
+  -- set up http client
   httpManager <- newManager tlsManagerSettings
+
+  -- set up translate
   let translateF = getGoogleTranslation httpManager googleKey 
+
+  -- setup redis
+  let redisConnectInfo = R.defaultConnectInfo { 
+    R.connectHost = T.unpack (redisHost redisConfig)
+  }
+  redisConnection <- R.connect redisConnectInfo
+    
+  -- setup web server
   scotty 3000 $ do
-    post "/translate" $ webTranslateAction translateF
+    post "/translate" $ webTranslateAction translateF (putDb redisConnection)
