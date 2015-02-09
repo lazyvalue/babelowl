@@ -48,6 +48,8 @@ getLangByName inName = Map.lookup (T.toLower inName) langNameMap
 -- handy function declarations
 type GetTranslation = Lang -> T.Text -> IO GoogleTranslateResult
 type Storer = T.Text -> T.Text -> IO ()
+type StoreGetter = T.Text -> IO (Maybe T.Text)
+type Caller = T.Text -> IO ()
 
 -- [ Request building
 googleTranslateQuery :: GoogleKey -> Lang -> T.Text -> T.Text
@@ -80,24 +82,36 @@ parseTextRequest input = do
     Just lang -> return (lang, toTranslate)
     Nothing -> Left UnknownLanguage
 
-webTranslateAction :: GetTranslation -> Storer -> ActionM ()
-webTranslateAction getTransF storer = do
+webTranslateAction :: GetTranslation -> Storer -> Caller -> ActionM ()
+webTranslateAction getTransF storer caller = do
   msgBody <- param "Body"
-  --msgSid <- param "MessageSid"
+  msgSid <- param "MessageSid"
   let parseResult = parseTextRequest $ TL.toStrict msgBody
   sometext <- case parseResult of
     Left problem -> 
       return $ mkFailureTwiml
-    Right (lang, text) -> liftIO (do 
+    Right (lang, text) -> do 
+      liftIO $ storer msgSid (T.concat [lang_Code lang, langMsgSep, text])
+      liftIO $ caller msgSid
+      liftIO (do 
         translationResult <- getTransF lang text
         let transText = gtr_Translation $ head (getGoogleTranslations translationResult)
         return $ mkSuccessTwiml lang transText)
   html sometext
 
+webSpeakAction :: StoreGetter -> ActionM ()
+webSpeakAction getter = do
+  inSid <- param "InSid"
+  rawRecordMaybe <- liftIO $ getter $ TL.toStrict inSid
+  case rawRecordMaybe of
+    Nothing -> html mkCallFail
+    Just rawRecord ->
+      let (lang,body) = tuplify $ T.split (== (T.head langMsgSep)) rawRecord
+      in html $ mkCallResponseTwiml lang body
+
 parseConfig :: T.Text -> Maybe (GoogleKey, TwilioCredentials, RedisConfig)
 parseConfig confBuf =
-  let tuplify [x,y] = (x,y)
-      configMap = Map.fromList $ map (tuplify . (T.split (== '='))) $ T.lines confBuf
+  let configMap = Map.fromList $ map (tuplify . (T.split (== '='))) $ T.lines confBuf
       lookup = (flip Map.lookup) configMap
       googleKey = GoogleKey <$> lookup "googleApiKey"
       twiKey = TwilioCredentials <$> lookup "twilioAccountSid" <*> lookup "twilioAuthToken"
@@ -105,8 +119,26 @@ parseConfig confBuf =
   in (,,) <$> googleKey <*> twiKey <*> redisConfig
 
 
+tuplify [x,y] = (x,y)
+
+-- [ DB operations
+langMsgSep :: T.Text
+langMsgSep = "|"
+
 putDb :: R.Connection -> T.Text -> T.Text -> IO ()
-putDb conn key val = undefined
+putDb conn key val = R.runRedis conn $ do
+  let keyName = TE.encodeUtf8 key
+  R.set keyName (TE.encodeUtf8 val)
+  R.expire keyName 3600
+  return ()
+
+getDb :: R.Connection -> T.Text -> IO (Maybe T.Text)
+getDb conn key = R.runRedis conn $ do
+  ret <- R.get $ TE.encodeUtf8 key
+  return $ case ret of
+    Left _ -> Nothing
+    Right (Just v) -> Just $ TE.decodeUtf8 v
+    Right _ -> Nothing
 
 main :: IO ()
 main = do
@@ -120,12 +152,19 @@ main = do
   -- set up translate
   let translateF = getGoogleTranslation httpManager googleKey 
 
+  -- set up caller
+  let caller = callTwilioVoice twilioCredentials httpManager
+
   -- setup redis
   let redisConnectInfo = R.defaultConnectInfo { 
     R.connectHost = T.unpack (redisHost redisConfig)
   }
+
   redisConnection <- R.connect redisConnectInfo
+  let getter = getDb redisConnection
+  let storer = putDb redisConnection
     
   -- setup web server
   scotty 3000 $ do
-    post "/translate" $ webTranslateAction translateF (putDb redisConnection)
+    post "/translate" $ webTranslateAction translateF storer caller
+    get "/call" $ webSpeakAction getter

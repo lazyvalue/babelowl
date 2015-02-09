@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-module TwilioApi where
+module TwilioApi (
+  callTwilioVoice
+) where
 
 import BabelTypes
 import qualified Data.Text as T
@@ -14,18 +16,20 @@ twilioVoiceQuery creds =
   T.concat [ "https://api.twilio.com/2010-04-01/Accounts/", twilio_accountSid creds, 
     "/Calls.js"]
 
-mkRequest :: MonadThrow m => TwilioCredentials -> m Request
-mkRequest creds = do
+mkRequest :: MonadThrow m => TwilioCredentials -> T.Text -> m Request
+mkRequest creds insid = do
   blankRequest <- parseUrl $ T.unpack $ twilioVoiceQuery creds
   let user = encodeUtf8 $ twilio_accountSid creds
   let pass = encodeUtf8 $ twilio_authToken creds
   let authRequest = applyBasicAuth user pass blankRequest
-  let bodyContent = [ ("From", "+19253266177"), ("url", "http://babelowl.thereceptor.net") ]
+  let urlBlah = [ "http://babelowl.thereceptor.net?/call?InSid=" , insid ]
+  let callbackUrl = encodeUtf8 $ T.concat urlBlah
+  let bodyContent = [ ("From", "+19253266177"), ("url", callbackUrl) ]
   let bodiedRequest = urlEncodedBody bodyContent authRequest
   return bodiedRequest
 
-callTwilioVoice :: TwilioCredentials -> Manager -> IO ()
-callTwilioVoice credentials manager = runResourceT $ do
-  request <- mkRequest credentials
+callTwilioVoice :: TwilioCredentials -> Manager -> T.Text -> IO ()
+callTwilioVoice credentials manager insid = runResourceT $ do
+  request <- mkRequest credentials insid
   httpLbs request manager
   return ()

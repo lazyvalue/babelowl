@@ -2,6 +2,8 @@
 module Twiml (
   mkSuccessTwiml
   , mkFailureTwiml
+  , mkCallResponseTwiml
+  , mkCallFail
 ) where
 
 import BabelTypes
@@ -11,26 +13,35 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Text.XML 
 
-mkAttrElem :: T.Text -> [(T.Text,T.Text)] -> [Element] -> Element
+type AttrLst = [(T.Text, T.Text)]
+
+mkAttrs :: AttrLst -> M.Map Name T.Text
+mkAttrs inAttrs =
+  let tpler (attrN, attrV) = ((Name attrN Nothing Nothing), attrV)
+  in M.fromList (map tpler inAttrs)
+
+mkAttrElem :: T.Text -> AttrLst -> [Element] -> Element
 mkAttrElem name attrLst subElems =
-  Element (Name name Nothing Nothing) attrM (map NodeElement subElems)
-  where tpler (attrN, attrV) = ((Name attrN Nothing Nothing), attrV)
-        attrM = M.fromList (map tpler attrLst)
+  Element (Name name Nothing Nothing) (mkAttrs attrLst) (map NodeElement subElems)
 
 mkElem :: T.Text -> [Element] -> Element
 mkElem name subElems = mkAttrElem name [] subElems
 
+mkAttrTextElem :: T.Text -> AttrLst -> T.Text -> Element
+mkAttrTextElem name attrs body =
+  Element (Name name Nothing Nothing) (mkAttrs attrs) [(NodeContent body)]
+
 mkTextElem :: T.Text -> T.Text -> Element
 mkTextElem name body =
-  Element (Name name Nothing Nothing) M.empty [(NodeContent body)]
+  mkAttrTextElem name [] body
 
 mkDumbDocText :: Element -> TL.Text
 mkDumbDocText docRoot =
   renderText def $ Document pro docRoot []
     where pro = Prologue [] Nothing []
 
-mkSuccessTwimlElem :: Lang -> T.Text -> Element
-mkSuccessTwimlElem lang body =
+mkSuccessTwimlElem :: T.Text -> Element
+mkSuccessTwimlElem body =
   mkElem "Response" [
     mkTextElem "Message" body
   ]
@@ -41,4 +52,16 @@ mkFailureTwiml =
 
 mkSuccessTwiml :: Lang -> T.Text -> TL.Text
 mkSuccessTwiml lang body = 
-  mkDumbDocText (mkSuccessTwimlElem lang body)
+  mkDumbDocText (mkSuccessTwimlElem body)
+
+mkSay :: T.Text -> T.Text -> Element
+mkSay lang body = undefined
+
+mkCallResponseTwiml :: T.Text -> T.Text -> TL.Text
+mkCallResponseTwiml lang body = 
+  mkDumbDocText $ mkElem "Response" [
+    mkAttrTextElem "Say" [("voice", "woman"), ("language", lang)] body
+  ]
+
+mkCallFail :: TL.Text
+mkCallFail = mkDumbDocText (mkElem "Response" [mkElem "Hangup" []])
