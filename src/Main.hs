@@ -49,7 +49,7 @@ getLangByName inName = Map.lookup (T.toLower inName) langNameMap
 type GetTranslation = Lang -> T.Text -> IO GoogleTranslateResult
 type Storer = T.Text -> T.Text -> IO ()
 type StoreGetter = T.Text -> IO (Maybe T.Text)
-type Caller = T.Text -> IO ()
+type Caller = T.Text -> T.Text -> IO ()
 
 -- [ Request building
 googleTranslateQuery :: GoogleKey -> Lang -> T.Text -> T.Text
@@ -86,13 +86,14 @@ webTranslateAction :: GetTranslation -> Storer -> Caller -> ActionM ()
 webTranslateAction getTransF storer caller = do
   msgBody <- param "Body"
   msgSid <- param "MessageSid"
+  fromNum <- param "From"
   let parseResult = parseTextRequest $ TL.toStrict msgBody
   sometext <- case parseResult of
     Left problem -> 
       return $ mkFailureTwiml
     Right (lang, text) -> do 
       liftIO $ storer msgSid (T.concat [lang_Code lang, langMsgSep, text])
-      liftIO $ caller msgSid
+      liftIO $ caller msgSid fromNum
       liftIO (do 
         translationResult <- getTransF lang text
         let transText = gtr_Translation $ head (getGoogleTranslations translationResult)
