@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-module BabelLangs where (
+module BabelLangs (
   Lang (..)
   , langName
   , langCode
-)
+  , getLangByName
+) where 
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 
 data Lang = German | Italian | French | Spanish
@@ -24,7 +26,7 @@ langCode Spanish = "es"
 langList :: [Lang]
 langList = [German, Italian, French, Spanish]
 
-langNameMap :: T.Text -> Maybe Lang
+langNameMap :: Map.Map T.Text Lang
 langNameMap = Map.fromList $ map (\x -> (langName x, x)) langList
 
 getLangByName :: T.Text -> Maybe Lang

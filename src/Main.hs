@@ -5,6 +5,7 @@ import Web.Scotty
 
 -- Local imports
 import Twiml
+import BabelLangs
 import BabelTypes
 import TwilioApi
 
@@ -45,7 +46,7 @@ googleTranslateQuery :: GoogleKey -> Lang -> T.Text -> T.Text
 googleTranslateQuery key lang body =
   T.concat [
     "https://www.googleapis.com/language/translate/v2?key=" , getGoogleKey key
-    , "&target=", lang_Code lang
+    , "&target=", langCode lang
     , "&q=", body
   ]
 
@@ -81,7 +82,7 @@ webTranslateAction getTransF storer caller = do
     Left problem -> 
       return $ mkFailureTwiml
     Right (lang, text) -> do 
-      liftIO $ storer msgSid (T.concat [lang_Code lang, langMsgSep, text])
+      liftIO $ storer msgSid (T.concat [langCode lang, langMsgSep, text])
       liftIO $ caller msgSid fromNum
       liftIO (do 
         translationResult <- getTransF lang text
