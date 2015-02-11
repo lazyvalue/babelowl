@@ -92,11 +92,11 @@ webTranslateAction getTransF storer caller = do
     Left problem -> 
       return $ mkFailureTwiml
     Right (lang, text) -> do 
-      liftIO $ storer msgSid (T.concat [lang_Code lang, langMsgSep, text])
       liftIO $ caller msgSid fromNum
       liftIO (do 
         translationResult <- getTransF lang text
         let transText = gtr_Translation $ head (getGoogleTranslations translationResult)
+        liftIO $ storer msgSid (T.concat [lang_Code lang, langMsgSep, transText])
         return $ mkSuccessTwiml lang transText)
   html sometext
 
