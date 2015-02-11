@@ -34,17 +34,6 @@ import Control.Monad.Trans.Resource (runResourceT)
 
 import qualified Database.Redis as R
 
--- [ Language maps and tools
-
-langList = [ Lang "french" "fr", Lang "german" "de" ]
-
-langCodeMap = Map.fromList $ map (\l -> (lang_Code l, l)) langList
-
-langNameMap = Map.fromList $ map (\l -> (lang_Name l, l)) langList
-
-getLangByName :: T.Text -> Maybe Lang
-getLangByName inName = Map.lookup (T.toLower inName) langNameMap
-
 -- handy function declarations
 type GetTranslation = Lang -> T.Text -> IO GoogleTranslateResult
 type Storer = T.Text -> T.Text -> IO ()
@@ -168,4 +157,4 @@ main = do
   -- setup web server
   scotty 3000 $ do
     post "/translate" $ webTranslateAction translateF storer caller
-    get "/call" $ webSpeakAction getter
+    post "/call" $ webSpeakAction getter

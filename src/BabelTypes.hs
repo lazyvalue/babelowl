@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module BabelTypes (
-  Lang (..)
-  , ParseException (..)
+  ParseException (..)
   , TwilioCredentials (..)
   , GoogleKey (..)
   , GoogleTranslation (..)
@@ -16,11 +15,6 @@ import Data.Functor
 import qualified Data.Text as T
 
 import Control.Monad
-
-data Lang = Lang {
-  lang_Name :: T.Text
-  , lang_Code :: T.Text
-} deriving Show
 
 data ParseException = BadFormat | UnknownLanguage deriving Show
 
