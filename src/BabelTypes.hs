@@ -1,12 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module BabelTypes (
-  Lang (..)
-  , ParseException (..)
-  , TwilioCredentials (..)
-  , GoogleKey (..)
+  ParseException (..)
   , GoogleTranslation (..)
   , GoogleTranslateResult (..)
-  , RedisConfig (..)
 ) where
 
 import Control.Applicative
@@ -17,24 +13,7 @@ import qualified Data.Text as T
 
 import Control.Monad
 
-data Lang = Lang {
-  lang_Name :: T.Text
-  , lang_Code :: T.Text
-} deriving Show
-
 data ParseException = BadFormat | UnknownLanguage deriving Show
-
-data TwilioCredentials = TwilioCredentials {
-  twilio_accountSid :: T.Text
-  , twilio_authToken :: T.Text
-} deriving Show
-
-newtype GoogleKey = GoogleKey { getGoogleKey :: T.Text } deriving Show
-
-data RedisConfig = RedisConfig {
-  redisHost :: T.Text
-  , redisPort :: Int
-}
 
 data GoogleTranslation = GoogleTranslation {
   gtr_DetectedSourceLanguage :: T.Text
