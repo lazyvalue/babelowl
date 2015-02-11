@@ -149,3 +149,4 @@ main = do
   scotty 3000 $ do
     post "/translate" $ webTranslateAction translateF storer caller
     post "/call" $ webSpeakAction getter
+    get "/" $ file "index.html"
