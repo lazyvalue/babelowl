@@ -23,10 +23,9 @@ mkRequest creds insid to = do
   let user = encodeUtf8 $ twilioAccountSid creds
   let pass = encodeUtf8 $ twilioAuthToken creds
   let authRequest = applyBasicAuth user pass blankRequest
-  let urlBlah = [ "http://babelowl.thereceptor.net:3000/call?InSid=" , insid ]
-  let callbackUrl = encodeUtf8 $ T.concat urlBlah
+  let callbackUrl = encodeUtf8 $ T.concat [ twilioCallCallback creds, insid ]
   let toNum = encodeUtf8 $ to
-  let bodyContent = [ ("From", "+19253266177"), ("To", toNum), ("Url", callbackUrl)  ]
+  let bodyContent = [ ("From", encodeUtf8 $ twilioPhoneNumber creds), ("To", toNum), ("Url", callbackUrl)  ]
   let bodiedRequest = urlEncodedBody bodyContent authRequest
   return bodiedRequest
 
