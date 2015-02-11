@@ -7,6 +7,7 @@ import Web.Scotty
 import Twiml
 import BabelLangs
 import BabelTypes
+import BabelConfig
 import TwilioApi
 
 import Network.HTTP.Conduit (parseUrl, newManager, httpLbs, RequestBody(..), Response(..), HttpException(..), Request(..), Manager, simpleHttp, withManager)
@@ -42,15 +43,15 @@ type StoreGetter = T.Text -> IO (Maybe T.Text)
 type Caller = T.Text -> T.Text -> IO ()
 
 -- [ Request building
-googleTranslateQuery :: GoogleKey -> Lang -> T.Text -> T.Text
+googleTranslateQuery :: T.Text -> Lang -> T.Text -> T.Text
 googleTranslateQuery key lang body =
   T.concat [
-    "https://www.googleapis.com/language/translate/v2?key=" , getGoogleKey key
+    "https://www.googleapis.com/language/translate/v2?key=" , key
     , "&target=", langCode lang
     , "&q=", body
   ]
 
-getGoogleTranslation :: Manager -> GoogleKey -> Lang -> T.Text -> IO GoogleTranslateResult
+getGoogleTranslation :: Manager -> T.Text -> Lang -> T.Text -> IO GoogleTranslateResult
 getGoogleTranslation man gKey lang body = runResourceT $ do
   req <- parseUrl $ T.unpack $ googleTranslateQuery gKey lang body
   response <- (httpLbs req man)
@@ -100,15 +101,6 @@ webSpeakAction getter = do
       let (lang,body) = tuplify $ T.split (== (T.head langMsgSep)) rawRecord
       in html $ mkCallResponseTwiml lang body
 
-parseConfig :: T.Text -> Maybe (GoogleKey, TwilioCredentials, RedisConfig)
-parseConfig confBuf =
-  let configMap = Map.fromList $ map (tuplify . (T.split (== '='))) $ T.lines confBuf
-      lookup = (flip Map.lookup) configMap
-      googleKey = GoogleKey <$> lookup "googleApiKey"
-      twiKey = TwilioCredentials <$> lookup "twilioAccountSid" <*> lookup "twilioAuthToken"
-      redisConfig = RedisConfig <$> lookup "redisHost" <*> Just 6379
-  in (,,) <$> googleKey <*> twiKey <*> redisConfig
-
 
 tuplify [x,y] = (x,y)
 
@@ -133,22 +125,20 @@ getDb conn key = R.runRedis conn $ do
 
 main :: IO ()
 main = do
-  -- parse config
-  configBuf <- fmap TE.decodeUtf8 $ B.readFile "babelOwlConfig"
-  let (googleKey,twilioCredentials, redisConfig) = fromJust $ parseConfig configBuf
+  config <- parseConfigFromFile
 
   -- set up http client
   httpManager <- newManager tlsManagerSettings
 
   -- set up translate
-  let translateF = getGoogleTranslation httpManager googleKey 
+  let translateF = getGoogleTranslation httpManager (googleKey config)
 
   -- set up caller
-  let caller = callTwilioVoice twilioCredentials httpManager
+  let caller = callTwilioVoice (twilioConfig config) httpManager
 
   -- setup redis
   let redisConnectInfo = R.defaultConnectInfo { 
-    R.connectHost = T.unpack (redisHost redisConfig)
+    R.connectHost = T.unpack (redisHost config)
   }
 
   redisConnection <- R.connect redisConnectInfo
