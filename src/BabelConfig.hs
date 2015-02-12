@@ -35,7 +35,8 @@ parseConfig confBuf =
       twilConfig = TwilioConfig <$> lku "twilioAccountSid"
         <*> lku "twilioAuthToken" 
         <*> lku "twilioPhoneNumber"
-        <*> lku "twilioCallCallback"
+        -- <*> lku "twilioCallCallback"
+	<*> Just "http://babelowl.thereceptor.net:3000/call?InSid="
 
   in  BabelConfig <$> twilConfig
         <*> lku "googleApiKey"
